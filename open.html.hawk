@@ -4,14 +4,15 @@
   <meta charset="utf-8" />
   <meta name="generator" content="pandoc" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
-  <title>openMP</title>
-  <style type="text/css">
+  <title>OpenMP experiments</title>
+  <style>
     body {max-width: 60em;}
     img {max-width: 100%; }
   </style>
   <link rel="stylesheet" href="empty.css" />
 </head>
 <body>
+<h1>OpenMP experiments</h1>
 <p>Here is how one can run experiments with OpenMP constructs. The
 computational work is emulated in function <tt>work()</tt>. The
 command line arguments set how "heavy" the work is for each of the
@@ -42,7 +43,7 @@ $ cat section.c
 $ c99 -fopenmp section.c -o section
 </pre>
 
-<p>A theread with less work peaks up both sections:</p>
+<p>A thread with less work peaks up both sections:</p>
 
 <pre>
 $ OMP_NUM_THREADS=2 ./section 1 8
