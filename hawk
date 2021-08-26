@@ -1,0 +1,51 @@
+#!/usr/bin/awk -f
+
+BEGIN {
+    sed = " | sed 's,<,\&lt;,g; s,>,\&gt;,g'"
+}
+
+function ltgt() {
+    gsub(/</, "\&lt;")
+    gsub(/>/, "\&gt;")
+}
+
+/^<\/pre>$/{
+    inside = 0
+    print
+    next
+}
+
+inside && /^\$\$ / {
+    sub(/^\$\$/, "$")
+    ltgt()
+    print
+    next
+}
+
+inside && /^\$ / {
+    cmd = $0
+    ltgt()
+    print
+    sub(/^\$ /, "", cmd)
+    gsub(/'/, "'\''", cmd)
+    system("sh -c '" cmd "'" sed)
+    next
+}
+
+inside {
+    ltgt()
+    print
+    next
+}
+
+
+/^<pre>$/  {
+    inside = 1
+    print
+    next
+}
+
+!inside {
+    print
+    next
+}
