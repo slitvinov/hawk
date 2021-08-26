@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="" xml:lang="">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>openMP</title>
+  <style type="text/css">
+    body {max-width: 60em;}
+    img {max-width: 100%; }
+  </style>
+  <link rel="stylesheet" href="empty.css" />
+</head>
+<body>
+<p>Here is how one can run experiments with OpenMP constructs. The
+computational work is emulated in function <tt>work()</tt>. The
+command line arguments set how "heavy" the work is for each of the
+threads. Parallel construct is executed by all of the threads.</p>
+
+<pre>
+$ cat parallel.c
+#include &lt;omp.h&gt;
+#include &lt;stdio.h&gt;
+#include &lt;stdlib.h&gt;
+static void work(int n) {
+    volatile int s;
+    for (int i = 0; i &lt; 100000000 * n; i++)
+        s = i;
+}
+int main(int argc, char** argv) {
+    int heavy[999];
+    int num_threads = omp_get_max_threads();
+    for (int i = 0; i &lt; num_threads; i++) {
+        if (argv[i + 1] == NULL) {
+            fprintf(stderr, "needs %d arguments\n", num_threads);
+            return 2;
+        }
+	heavy[i] = atoi(argv[i + 1]);
+    }
+#pragma omp parallel
+    {
+        int me = omp_get_thread_num();
+        work(heavy[me]);
+	putchar('a' + me);
+    }
+    putchar('\n');
+}
+$ c99 -fopenmp parallel.c -o parallel
+</pre>
+
+<p>If work is equal the output varies.</p>
+<pre>
+$ OMP_NUM_THREADS=2 ./parallel 1 1
+ba
+$ OMP_NUM_THREADS=2 ./parallel 1 1
+ab
+</pre>
+
+<p>A thread with more work finishes last.</p>
+<pre>
+$ OMP_NUM_THREADS=2 ./parallel 1 4
+ab
+$ OMP_NUM_THREADS=4 ./parallel 1 2 4 8
+abcd
+$ OMP_NUM_THREADS=4 ./parallel 8 4 2 1
+dcba
+</pre>
+
+<p>Each of the sections is executed by only by one of the threads.</p>
+
+<pre>
+$ cat section.c
+#include &lt;omp.h&gt;
+#include &lt;stdio.h&gt;
+#include &lt;stdlib.h&gt;
+static void work(int n) {
+    volatile int s;
+    for (int i = 0; i &lt; 100000000 * n; i++)
+        s = i;
+}
+int main(int argc, char** argv) {
+    int heavy[99];
+    int num_threads = omp_get_max_threads();
+    for (int i = 0; i &lt; num_threads; i++) {
+        if (argv[i + 1] == NULL) {
+            fprintf(stderr, "needs %d arguments\n", num_threads);
+            return 2;
+        }
+	heavy[i] = atoi(argv[i + 1]);
+    }
+#pragma omp parallel
+    {
+        int me = omp_get_thread_num();
+        work(heavy[me]);
+#pragma omp sections
+        {
+#pragma omp section
+            {
+                work(heavy[me]);
+		putchar('a' + me);
+            }
+#pragma omp section
+            {
+                work(heavy[me]);
+		putchar('A' + me);
+            }
+        }
+    }
+    putchar('\n');
+}
+$ c99 -fopenmp section.c -o section
+</pre>
+
+<p>A theread with less work peaks up both sections:</p>
+
+<pre>
+$ OMP_NUM_THREADS=2 ./section 1 8
+aA
+$ OMP_NUM_THREADS=4 ./section 8 8 1 8
+cC
+</pre>
+
+<pre>
+$ cat for.c
+#include &lt;omp.h&gt;
+#include &lt;stdio.h&gt;
+#include &lt;stdlib.h&gt;
+static void work(int n) {
+    volatile int s;
+    for (int i = 0; i &lt; 100000000 * n; i++)
+        s = i;
+}
+int main(int argc, char** argv) {
+    int heavy[999];
+    int num_threads = omp_get_max_threads();
+    for (int i = 0; i &lt; num_threads; i++) {
+        if (argv[i + 1] == NULL) {
+            fprintf(stderr, "needs %d arguments\n", num_threads);
+            return 2;
+        }
+        heavy[i] = atoi(argv[i + 1]);
+    }
+#pragma omp parallel
+    {
+        int me = omp_get_thread_num();
+#pragma omp for schedule(runtime)
+        for (int j = 0; j &lt; 10; j++) {
+            work(heavy[me]);
+            putchar('a' + me);
+        }
+    }
+    putchar('\n');
+}
+$ c99 -fopenmp for.c -o for
+</pre>
+
+<p>The output depends on how the tasks are splitted in chunks. A thread
+with heavy work can finish only one chunk.</p>
+
+<pre>
+$ OMP_SCHEDULE=dynamic,3 OMP_NUM_THREADS=2 ./for 1 15
